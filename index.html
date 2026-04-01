@@ -395,7 +395,7 @@ function renderAsciiBubble(text, maxW=30) {
 // ── State ──
 let state = {
   species:'cat', eye:'·', hat:'none', view:'card', tick:0, animTimer:null,
-  speed:400, gachaComp:null, gachaPhase:'input', petAnim:false,
+  speed:400, gachaComp:null, gachaPhase:'input', petAnim:false, gachaUserId:null,
 };
 const IDLE = [0,0,0,0,1,0,0,0,-1,0,0,2,0,0,0];
 
@@ -637,11 +637,13 @@ function renderGacha(container) {
 function doGachaRoll() {
   const input = document.getElementById('gachaInput')?.value?.trim();
   if(!input) return;
+  state.gachaUserId = input;
   state.gachaComp = rollCompanion(input);
   state.gachaPhase = 'hatching';
   render();
 }
 function doRandomRoll() {
+  state.gachaUserId = null;
   state.gachaComp = rollCompanion('rng-' + Date.now() + Math.random());
   state.gachaPhase = 'hatching';
   // Force re-mount gacha card on next result render
@@ -668,7 +670,7 @@ function buildShareText(c) {
     ...STAT_NAMES.map(s => `${s.padEnd(12)}${bar(c.stats[s])} ${c.stats[s]}`),
     '',
     `🐾 Claude Code Buddy`,
-    SITE_URL,
+    getShareUrl(),
   ];
   return lines.join('\n');
 }
@@ -686,9 +688,15 @@ function buildSharePreviewHtml(c) {
   }).join('\n');
 }
 
+function getShareUrl() {
+  if(!state.gachaUserId) return SITE_URL;
+  return SITE_URL + '?user=' + encodeURIComponent(state.gachaUserId);
+}
+
 function openShareModal() {
   const c = state.gachaComp;
   if(!c) return;
+  const shareUrl = getShareUrl();
   const color = `var(--${c.rarity})`;
   const face = FACES[c.species](c.eye);
   const previewHtml = buildSharePreviewHtml(c);
@@ -705,9 +713,10 @@ function openShareModal() {
 
 <span style="color:${color};font-weight:bold">${c.shiny?'✨ ':''}${c.name}</span>  <span style="color:var(--dim)">${RARITY_STARS[c.rarity]} ${c.rarity.toUpperCase()}</span>
 <span style="color:var(--dim)">${c.species} ${escHtml(face)}</span></div>
-      <input class="share-url" type="text" value="${SITE_URL}" readonly onclick="this.select()">
+      <input class="share-url" type="text" value="${shareUrl}" readonly onclick="this.select()">
       <div class="share-btns">
         <button class="gacha-btn secondary" onclick="copyShareText()">📋 Copy Text</button>
+        <button class="gacha-btn secondary" onclick="copyShareLink()">🔗 Copy Link</button>
         <button class="gacha-btn primary" onclick="saveShareImage()">🖼 Save Image</button>
       </div>
     </div>
@@ -730,6 +739,10 @@ function showToast(msg) {
 function copyShareText() {
   const text = buildShareText(state.gachaComp);
   navigator.clipboard.writeText(text).then(()=> showToast('Copied to clipboard!'));
+}
+
+function copyShareLink() {
+  navigator.clipboard.writeText(getShareUrl()).then(()=> showToast('Link copied!'));
 }
 
 function saveShareImage() {
@@ -804,6 +817,18 @@ function restartAnimation() {
 }
 
 // ── Boot ──
+// Check URL param: ?user=xxx → auto-show gacha result
+const urlParams = new URLSearchParams(window.location.search);
+const urlUser = urlParams.get('user');
+if(urlUser) {
+  state.view = 'gacha';
+  state.gachaUserId = urlUser;
+  state.gachaComp = rollCompanion(urlUser);
+  state.gachaPhase = 'result';
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === 'gacha');
+  });
+}
 render();
 restartAnimation();
 </script>
