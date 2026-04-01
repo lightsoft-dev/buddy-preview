@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Buddy Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --common: #8b949e; --uncommon: #3fb950; --rare: #58a6ff;
+    --epic: #bc8cff; --legendary: #d29922;
+  }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; overflow-x: hidden;
+  }
+
+  header {
+    text-align: center; padding: 32px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161b22 0%, var(--bg) 100%);
+  }
+  header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--dim); font-size: 12px; margin-top: 6px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px; padding: 20px;
+    justify-content: center; align-items: flex-end;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .control-group { display: flex; flex-direction: column; gap: 4px; }
+  .control-group label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .control-group select, .control-group input {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+    cursor: pointer; min-width: 120px;
+  }
+  .control-group select:hover, .control-group input:hover { border-color: var(--accent); }
+  .control-group select:focus, .control-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.2); }
+
+  .eye-picker { display: flex; gap: 4px; }
+  .eye-btn {
+    width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .eye-btn:hover { border-color: var(--accent); background: #1c2333; }
+  .eye-btn.active { border-color: var(--accent); background: #1c2333; box-shadow: 0 0 0 2px rgba(88,166,255,0.3); }
+
+  .tabs {
+    display: flex; justify-content: center; gap: 4px; padding: 16px 20px 0;
+  }
+  .tab {
+    padding: 8px 20px; border-radius: 8px 8px 0 0; border: 1px solid var(--border);
+    border-bottom: none; background: var(--bg); color: var(--dim); cursor: pointer;
+    font-family: inherit; font-size: 12px; transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--card); color: var(--accent); border-color: var(--accent); }
+
+  .view-container {
+    padding: 24px 20px; display: flex; justify-content: center;
+  }
+
+  /* ── Card View ── */
+  .card {
+    border: 2px solid var(--border); border-radius: 12px; overflow: hidden;
+    background: var(--card); width: 380px; transition: border-color 0.3s;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .card.common { border-color: var(--common); }
+  .card.uncommon { border-color: var(--uncommon); }
+  .card.rare { border-color: var(--rare); }
+  .card.epic { border-color: var(--epic); }
+  .card.legendary { border-color: var(--legendary); animation: legendaryGlow 2s infinite alternate; }
+
+  @keyframes legendaryGlow {
+    from { box-shadow: 0 0 20px rgba(210,153,34,0.3); }
+    to { box-shadow: 0 0 40px rgba(210,153,34,0.6); }
+  }
+
+  .card-sprite {
+    text-align: center; padding: 20px 20px 12px; font-size: 15px;
+    line-height: 1.35; white-space: pre; min-height: 260px;
+    position: relative; cursor: pointer; user-select: none;
+  }
+  .card-sprite:active .hearts { opacity: 1; }
+
+  .card-info {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-name { font-size: 18px; font-weight: 700; }
+  .card-name .shiny { margin-right: 4px; }
+  .card-rarity { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .card-species { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+  .card-stats { padding: 12px 20px 20px; border-top: 1px solid var(--border); }
+  .stat-row { display: flex; align-items: center; margin: 6px 0; gap: 8px; }
+  .stat-label { font-size: 11px; color: var(--dim); width: 80px; text-transform: uppercase; }
+  .stat-bar-bg { flex: 1; height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; }
+  .stat-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .stat-value { font-size: 11px; width: 28px; text-align: right; }
+
+  .hearts {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #f85149;
+  }
+  .hearts.show { opacity: 1; }
+
+  /* ── Speech Bubble ── */
+  .bubble-area {
+    text-align: center; padding: 0 20px 12px; min-height: 52px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .speech-bubble {
+    background: #1c2333; border: 1px solid var(--border); border-radius: 12px;
+    padding: 8px 14px; font-size: 12px; color: var(--dim); font-style: italic;
+    max-width: 300px; opacity: 0; transition: opacity 0.5s;
+    position: relative;
+  }
+  .speech-bubble.show { opacity: 1; }
+  .speech-bubble::after {
+    content: ''; position: absolute; bottom: -7px; left: 50%;
+    transform: translateX(-50%); width: 12px; height: 7px;
+    background: #1c2333; clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+
+  /* ── Gallery View ── */
+  .gallery {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px; max-width: 1100px; width: 100%;
+  }
+  .gallery-item {
+    border: 1px solid var(--border); border-radius: 8px; padding: 16px 8px 12px;
+    text-align: center; cursor: pointer; transition: all 0.15s;
+    background: var(--card); position: relative; overflow: hidden;
+  }
+  .gallery-item:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  .gallery-item .sprite { font-size: 13px; line-height: 1.25; white-space: pre; height: 8.75em; display: flex; align-items: flex-end; justify-content: center; }
+  .gallery-item .name { font-size: 11px; color: var(--dim); margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* ── Gacha View ── */
+  .gacha-area { text-align: center; max-width: 500px; width: 100%; }
+  .gacha-input-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .gacha-input-row input {
+    flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; font-family: inherit; font-size: 14px;
+  }
+  .gacha-input-row input:focus { outline: none; border-color: var(--accent); }
+  .gacha-btn {
+    padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600; transition: all 0.15s;
+  }
+  .gacha-btn.primary { background: var(--accent); color: #fff; }
+  .gacha-btn.primary:hover { background: #79c0ff; transform: scale(1.02); }
+  .gacha-btn.secondary { background: var(--border); color: var(--text); }
+  .gacha-btn.secondary:hover { background: #484f58; }
+
+  .hatch-animation {
+    font-size: 48px; padding: 40px; animation: hatchBounce 0.6s ease;
+  }
+  @keyframes hatchBounce {
+    0% { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+    50% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  @keyframes fadeInUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .card.hatched { animation: fadeInUp 0.5s ease; }
+
+  .rarity-distribution {
+    display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden;
+    margin: 16px 0; width: 100%;
+  }
+  .rarity-distribution div { transition: width 0.3s; }
+
+  /* ── Animation Controls ── */
+  .anim-controls {
+    display: flex; gap: 8px; justify-content: center; margin-top: 12px;
+  }
+  .anim-btn {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-family: inherit;
+    font-size: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .anim-btn:hover { border-color: var(--accent); }
+  .anim-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  .speed-label { font-size: 11px; color: var(--dim); display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🐾 <span>Claude Code</span> Buddy Preview</h1>
+  <p>ASCII Companion Sprite Viewer — 18 species · 6 eyes · 8 hats · 5 rarities</p>
+</header>
+
+<div class="controls" id="controls">
+  <div class="control-group">
+    <label>Species</label>
+    <select id="speciesSelect"></select>
+  </div>
+  <div class="control-group">
+    <label>Eye</label>
+    <div class="eye-picker" id="eyePicker"></div>
+  </div>
+  <div class="control-group">
+    <label>Hat</label>
+    <select id="hatSelect"></select>
+  </div>
+  <div class="control-group">
+    <label>Speed</label>
+    <select id="speedSelect">
+      <option value="800">Slow</option>
+      <option value="400" selected>Normal</option>
+      <option value="200">Fast</option>
+    </select>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-view="card">Card</button>
+  <button class="tab" data-view="gallery">Gallery</button>
+  <button class="tab" data-view="gacha">Gacha Roll</button>
+</div>
+
+<div class="view-container" id="viewContainer"></div>
+
+<script>
+// ── Data ──
+const EYES = ['·','✦','×','◉','@','°'];
+const HATS_LIST = ['none','crown','tophat','propeller','halo','wizard','beanie','tinyduck'];
+const HAT_LINES = { none:'', crown:'   \\^^^/    ', tophat:'   [___]    ', propeller:'    -+-     ', halo:'   (   )    ', wizard:'    /^\\     ', beanie:'   (___)    ', tinyduck:'    ,>      ' };
+const RARITIES = ['common','uncommon','rare','epic','legendary'];
+const RARITY_WEIGHTS = { common:60, uncommon:25, rare:10, epic:4, legendary:1 };
+const RARITY_FLOOR = { common:5, uncommon:15, rare:25, epic:35, legendary:50 };
+const RARITY_STARS = { common:'★', uncommon:'★★', rare:'★★★', epic:'★★★★', legendary:'★★★★★' };
+const STAT_NAMES = ['DEBUGGING','PATIENCE','CHAOS','WISDOM','SNARK'];
+const SPECIES_LIST = ['duck','goose','blob','cat','dragon','octopus','owl','penguin','turtle','snail','ghost','axolotl','capybara','cactus','robot','rabbit','mushroom','chonk'];
+const NAMES = ['Mochi','Pixel','Nimbus','Biscuit','Sprout','Ziggy','Pebble','Tofu','Waffle','Cosmo','Pickle','Doodle','Widget','Nugget','Fizz','Maple','Ember','Luna','Pip','Sage','Socks','Orbit','Chai','Fern','Spark','Tater','Latte','Clover','Rune','Echo'];
+
+const QUIPS = [
+  "watching you code...", "blinks slowly.", "tilts head curiously.",
+  '"Did you try console.log?"', "nods approvingly.", '"Ship it!"',
+  "is judging your variable names.", '"One more commit..."',
+  "fell asleep. 💤", "wants a treat. 🍪", '"Have you tried turning it off and on?"',
+  "found a bug! ...and ate it.", '"I believe in you!"', "is vibing.",
+  '"Tabs > Spaces"', '"git push --force 🙈"', "is proud of you.",
+];
+
+const BODIES = {
+  duck:[[`            `,`    __      `,`  <({E} )___  `,`   (  ._>   `,`    \`--´    `],[`            `,`    __      `,`  <({E} )___  `,`   (  ._>   `,`    \`--´~   `],[`            `,`    __      `,`  <({E} )___  `,`   (  .__>  `,`    \`--´    `]],
+  goose:[[`            `,`     ({E}>    `,`     ||     `,`   _(__)_   `,`    ^^^^    `],[`            `,`    ({E}>     `,`     ||     `,`   _(__)_   `,`    ^^^^    `],[`            `,`     ({E}>>   `,`     ||     `,`   _(__)_   `,`    ^^^^    `]],
+  blob:[[`            `,`   .----.   `,`  ( {E}  {E} )  `,`  (      )  `,`   \`----´   `],[`            `,`  .------.  `,` (  {E}  {E}  ) `,` (        ) `,`  \`------´  `],[`            `,`    .--.    `,`   ({E}  {E})   `,`   (    )   `,`    \`--´    `]],
+  cat:[[`            `,`   /\\_/\\    `,`  ( {E}   {E})  `,`  (  ω  )   `,`  (")_(")   `],[`            `,`   /\\_/\\    `,`  ( {E}   {E})  `,`  (  ω  )   `,`  (")_(")~  `],[`            `,`   /\\-/\\    `,`  ( {E}   {E})  `,`  (  ω  )   `,`  (")_(")   `]],
+  dragon:[[`            `,`  /^\\  /^\\  `,` <  {E}  {E}  > `,` (   ~~   ) `,`  \`-vvvv-´  `],[`            `,`  /^\\  /^\\  `,` <  {E}  {E}  > `,` (        ) `,`  \`-vvvv-´  `],[`   ~    ~   `,`  /^\\  /^\\  `,` <  {E}  {E}  > `,` (   ~~   ) `,`  \`-vvvv-´  `]],
+  octopus:[[`            `,`   .----.   `,`  ( {E}  {E} )  `,`  (______)  `,`  /\\/\\/\\/\\  `],[`            `,`   .----.   `,`  ( {E}  {E} )  `,`  (______)  `,`  \\/\\/\\/\\/  `],[`     o      `,`   .----.   `,`  ( {E}  {E} )  `,`  (______)  `,`  /\\/\\/\\/\\  `]],
+  owl:[[`            `,`   /\\  /\\   `,`  (({E})({E}))  `,`  (  ><  )  `,`   \`----´   `],[`            `,`   /\\  /\\   `,`  (({E})({E}))  `,`  (  ><  )  `,`   .----.   `],[`            `,`   /\\  /\\   `,`  (({E})(-))  `,`  (  ><  )  `,`   \`----´   `]],
+  penguin:[[`            `,`  .---.     `,`  ({E}>{E})     `,` /(   )\\    `,`  \`---´     `],[`            `,`  .---.     `,`  ({E}>{E})     `,` |(   )|    `,`  \`---´     `],[`  .---.     `,`  ({E}>{E})     `,` /(   )\\    `,`  \`---´     `,`   ~ ~      `]],
+  turtle:[[`            `,`   _,--._   `,`  ( {E}  {E} )  `,` /[______]\\ `,`  \`\`    \`\`  `],[`            `,`   _,--._   `,`  ( {E}  {E} )  `,` /[______]\\ `,`   \`\`  \`\`   `],[`            `,`   _,--._   `,`  ( {E}  {E} )  `,` /[======]\\ `,`  \`\`    \`\`  `]],
+  snail:[[`            `,` {E}    .--.  `,`  \\  ( @ )  `,`   \\_\`--´   `,`  ~~~~~~~   `],[`            `,`  {E}   .--.  `,`  |  ( @ )  `,`   \\_\`--´   `,`  ~~~~~~~   `],[`            `,` {E}    .--.  `,`  \\  ( @  ) `,`   \\_\`--´   `,`   ~~~~~~   `]],
+  ghost:[[`            `,`   .----.   `,`  / {E}  {E} \\  `,`  |      |  `,`  ~\`~\`\`~\`~  `],[`            `,`   .----.   `,`  / {E}  {E} \\  `,`  |      |  `,`  \`~\`~~\`~\`  `],[`    ~  ~    `,`   .----.   `,`  / {E}  {E} \\  `,`  |      |  `,`  ~~\`~~\`~~  `]],
+  axolotl:[[`            `,`}~(______)~{`,`}~({E} .. {E})~{`,`  ( .--. )  `,`  (_/  \\_)  `],[`            `,`~}(______){~`,`~}({E} .. {E}){~`,`  ( .--. )  `,`  (_/  \\_)  `],[`            `,`}~(______)~{`,`}~({E} .. {E})~{`,`  (  --  )  `,`  ~_/  \\_~  `]],
+  capybara:[[`            `,`  n______n  `,` ( {E}    {E} ) `,` (   oo   ) `,`  \`------´  `],[`            `,`  n______n  `,` ( {E}    {E} ) `,` (   Oo   ) `,`  \`------´  `],[`    ~  ~    `,`  u______n  `,` ( {E}    {E} ) `,` (   oo   ) `,`  \`------´  `]],
+  cactus:[[`            `,` n  ____  n `,` | |{E}  {E}| | `,` |_|    |_| `,`   |    |   `],[`            `,`    ____    `,` n |{E}  {E}| n `,` |_|    |_| `,`   |    |   `],[` n        n `,` |  ____  | `,` | |{E}  {E}| | `,` |_|    |_| `,`   |    |   `]],
+  robot:[[`            `,`   .[||].   `,`  [ {E}  {E} ]  `,`  [ ==== ]  `,`  \`------´  `],[`            `,`   .[||].   `,`  [ {E}  {E} ]  `,`  [ -==- ]  `,`  \`------´  `],[`     *      `,`   .[||].   `,`  [ {E}  {E} ]  `,`  [ ==== ]  `,`  \`------´  `]],
+  rabbit:[[`            `,`   (\\__/)   `,`  ( {E}  {E} )  `,` =(  ..  )= `,`  (")__(")  `],[`            `,`   (|__/)   `,`  ( {E}  {E} )  `,` =(  ..  )= `,`  (")__(")  `],[`            `,`   (\\__/)   `,`  ( {E}  {E} )  `,` =( .  . )= `,`  (")__(")  `]],
+  mushroom:[[`            `,` .-o-OO-o-. `,`(__________)`,`   |{E}  {E}|   `,`   |____|   `],[`            `,` .-O-oo-O-. `,`(__________)`,`   |{E}  {E}|   `,`   |____|   `],[`   . o  .   `,` .-o-OO-o-. `,`(__________)`,`   |{E}  {E}|   `,`   |____|   `]],
+  chonk:[[`            `,`  /\\    /\\  `,` ( {E}    {E} ) `,` (   ..   ) `,`  \`------´  `],[`            `,`  /\\    /|  `,` ( {E}    {E} ) `,` (   ..   ) `,`  \`------´  `],[`            `,`  /\\    /\\  `,` ( {E}    {E} ) `,` (   ..   ) `,`  \`------´~ `]],
+};
+
+const FACES = {
+  duck:(e)=>`(${e}>`, goose:(e)=>`(${e}>`, blob:(e)=>`(${e}${e})`, cat:(e)=>`=${e}ω${e}=`,
+  dragon:(e)=>`<${e}~${e}>`, octopus:(e)=>`~(${e}${e})~`, owl:(e)=>`(${e})(${e})`,
+  penguin:(e)=>`(${e}>)`, turtle:(e)=>`[${e}_${e}]`, snail:(e)=>`${e}(@)`,
+  ghost:(e)=>`/${e}${e}\\`, axolotl:(e)=>`}${e}.${e}{`, capybara:(e)=>`(${e}oo${e})`,
+  cactus:(e)=>`|${e}  ${e}|`, robot:(e)=>`[${e}${e}]`, rabbit:(e)=>`(${e}..${e})`,
+  mushroom:(e)=>`|${e}  ${e}|`, chonk:(e)=>`(${e}.${e})`,
+};
+
+// ── PRNG ──
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => { a|=0; a=(a+0x6d2b79f5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return((t^(t>>>14))>>>0)/4294967296; };
+}
+function hashString(s) { let h=2166136261; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0; }
+function pick(rng,arr) { return arr[Math.floor(rng()*arr.length)]; }
+function rollRarity(rng) { const total=100; let roll=rng()*total; for(const r of RARITIES){roll-=RARITY_WEIGHTS[r]; if(roll<0)return r;} return 'common'; }
+function rollStats(rng, rarity) {
+  const floor=RARITY_FLOOR[rarity], peak=pick(rng,STAT_NAMES); let dump=pick(rng,STAT_NAMES);
+  while(dump===peak) dump=pick(rng,STAT_NAMES);
+  const stats={};
+  for(const n of STAT_NAMES) {
+    if(n===peak) stats[n]=Math.min(100,floor+50+Math.floor(rng()*30));
+    else if(n===dump) stats[n]=Math.max(1,floor-10+Math.floor(rng()*15));
+    else stats[n]=floor+Math.floor(rng()*40);
+  }
+  return stats;
+}
+function rollCompanion(userId) {
+  const rng=mulberry32(hashString(userId+'friend-2026-401')), rarity=rollRarity(rng);
+  return { rarity, species:pick(rng,SPECIES_LIST), eye:pick(rng,EYES), hat:rarity==='common'?'none':pick(rng,HATS_LIST), shiny:rng()<0.01, stats:rollStats(rng,rarity), name:pick(rng,NAMES) };
+}
+
+// ── Render ──
+function renderSprite(species, eye, hat, frame=0) {
+  const frames=BODIES[species], body=frames[frame%frames.length].map(l=>l.replaceAll('{E}',eye));
+  const lines=[...body];
+  if(hat!=='none' && !lines[0].trim()) lines[0]=HAT_LINES[hat];
+  return lines;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── ASCII Speech Bubble ──
+const BUBBLE_LINES_MAX = 6; // fixed height to prevent layout jumps
+function renderAsciiBubble(text, maxW=30) {
+  if(!text) {
+    // return empty lines to keep height stable
+    return Array(BUBBLE_LINES_MAX).fill('');
+  }
+  // word wrap
+  const words = text.split(' '), wrapped = [];
+  let cur = '';
+  for(const w of words) {
+    if(cur.length + w.length + 1 > maxW && cur) { wrapped.push(cur); cur = w; }
+    else cur = cur ? cur + ' ' + w : w;
+  }
+  if(cur) wrapped.push(cur);
+  const innerW = Math.max(...wrapped.map(l=>l.length), 4);
+  const lines = [];
+  lines.push('╭' + '─'.repeat(innerW + 2) + '╮');
+  for(const l of wrapped) lines.push('│ ' + l.padEnd(innerW) + ' │');
+  lines.push('╰' + '─'.repeat(innerW + 2) + '╯');
+  // tail pointing down toward sprite
+  const tailPad = Math.min(6, innerW);
+  lines.push(' '.repeat(tailPad) + '╲');
+  lines.push(' '.repeat(tailPad + 1) + '╲');
+  // pad to fixed height
+  while(lines.length < BUBBLE_LINES_MAX) lines.unshift('');
+  return lines;
+}
+
+// ── State ──
+let state = {
+  species:'cat', eye:'·', hat:'none', view:'card', tick:0, animTimer:null,
+  speed:400, gachaComp:null, gachaPhase:'input', petAnim:false,
+};
+const IDLE = [0,0,0,0,1,0,0,0,-1,0,0,2,0,0,0];
+
+// ── Init Controls ──
+const speciesSelect = document.getElementById('speciesSelect');
+SPECIES_LIST.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; speciesSelect.appendChild(o); });
+speciesSelect.value = state.species;
+
+const eyePicker = document.getElementById('eyePicker');
+EYES.forEach(e => {
+  const btn = document.createElement('button');
+  btn.className = 'eye-btn' + (e===state.eye?' active':'');
+  btn.textContent = e; btn.dataset.eye = e;
+  eyePicker.appendChild(btn);
+});
+
+const hatSelect = document.getElementById('hatSelect');
+HATS_LIST.forEach(h => { const o=document.createElement('option'); o.value=h; o.textContent=h; hatSelect.appendChild(o); });
+
+// ── Events ──
+speciesSelect.onchange = () => { state.species=speciesSelect.value; render(); };
+hatSelect.onchange = () => { state.hat=hatSelect.value; render(); };
+document.getElementById('speedSelect').onchange = (e) => { state.speed=+e.target.value; restartAnimation(); };
+
+eyePicker.onclick = (e) => {
+  const btn = e.target.closest('.eye-btn');
+  if(!btn) return;
+  state.eye = btn.dataset.eye;
+  eyePicker.querySelectorAll('.eye-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+};
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    state.view = tab.dataset.view;
+    state.gachaPhase = 'input';
+    cardMounted = false;
+    render();
+  };
+});
+
+// ── Render Views ──
+function render() {
+  const container = document.getElementById('viewContainer');
+  if(state.view==='card') renderCard(container);
+  else if(state.view==='gallery') renderGallery(container);
+  else if(state.view==='gacha') renderGacha(container);
+}
+
+function getStatColor(rarity) {
+  return `var(--${rarity})`;
+}
+
+function buildSpriteHtml(species, eye, hat, tick, name, color) {
+  const step = IDLE[tick % IDLE.length];
+  let frame, blink=false;
+  if(step===-1){frame=0;blink=true;} else frame=step;
+  let lines = renderSprite(species, eye, hat, frame);
+  if(blink) lines = lines.map(l=>l.replaceAll(eye,'-'));
+
+  const quipIdx = Math.floor(tick / 12) % QUIPS.length;
+  const showQuip = (tick % 12) < 8;
+  const quipText = showQuip ? (name + ' ' + QUIPS[quipIdx]) : '';
+  const bubbleLines = renderAsciiBubble(quipText);
+  const allLines = [...bubbleLines, ...lines];
+  const bubbleCount = bubbleLines.length;
+  return allLines.map((l, i) => {
+    const esc = escHtml(l);
+    if(i < bubbleCount) return `<span style="color:var(--dim);opacity:${showQuip?'1':'0.3'}">${esc}</span>`;
+    return `<span style="color:${color}">${esc}</span>`;
+  }).join('\n');
+}
+
+let cardMounted = false;
+let cardSpeciesKey = '';
+
+function renderCard(container) {
+  const {species, eye, hat} = state;
+  const rng = mulberry32(hashString(species));
+  const rarity = rollRarity(rng);
+  const shiny = rng() < 0.01;
+  const stats = rollStats(rng, rarity);
+  const name = pick(rng, NAMES);
+  const face = FACES[species](eye);
+  const color = `var(--${rarity})`;
+
+  const key = species + eye + hat;
+
+  // Only rebuild full DOM when species/eye/hat changes, not every tick
+  if(!cardMounted || cardSpeciesKey !== key || !document.getElementById('spriteArea')) {
+    cardSpeciesKey = key;
+    cardMounted = true;
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="card ${rarity}">
+          <div class="card-sprite" id="spriteArea" title="Click to pet!">
+            <div id="spriteContent"></div>
+            <div class="hearts" id="hearts">♥ ♥ ♥</div>
+          </div>
+          <div class="card-info">
+            <div>
+              <div class="card-name" style="color:${color}">${shiny?'<span class="shiny">✨</span>':''}${name}</div>
+              <div class="card-species">${species} ${escHtml(face)}</div>
+            </div>
+            <div class="card-rarity" style="color:${color}">${RARITY_STARS[rarity]}<br>${rarity.toUpperCase()}</div>
+          </div>
+          <div class="card-stats">
+            ${STAT_NAMES.map(s => `
+              <div class="stat-row">
+                <span class="stat-label">${s}</span>
+                <div class="stat-bar-bg"><div class="stat-bar" style="width:${stats[s]}%;background:${color}"></div></div>
+                <span class="stat-value">${stats[s]}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('spriteArea').onclick = () => {
+      const h = document.getElementById('hearts');
+      h.classList.add('show');
+      setTimeout(()=>h.classList.remove('show'), 1500);
+    };
+  }
+
+  // Update only the sprite+bubble text each tick
+  const el = document.getElementById('spriteContent');
+  if(el) el.innerHTML = buildSpriteHtml(species, eye, hat, state.tick, name, color);
+}
+
+function renderGallery(container) {
+  const {eye, hat} = state;
+  const step = IDLE[state.tick % IDLE.length];
+  let frame, blink=false;
+  if(step===-1){frame=0;blink=true;} else frame=step;
+
+  container.innerHTML = `
+    <div class="gallery">
+      ${SPECIES_LIST.map(s => {
+        let lines = renderSprite(s, eye, hat, frame);
+        if(blink) lines = lines.map(l=>l.replaceAll(eye,'-'));
+        const trimmed = lines[0].trim() ? lines : lines.slice(1);
+        return `
+          <div class="gallery-item" onclick="selectSpecies('${s}')">
+            <div class="sprite">${escHtml(trimmed.join('\n'))}</div>
+            <div class="name">${s}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function selectSpecies(s) {
+  state.species = s;
+  speciesSelect.value = s;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('[data-view="card"]').classList.add('active');
+  state.view = 'card';
+  render();
+}
+
+function renderGacha(container) {
+  if(state.gachaPhase === 'input') {
+    container.innerHTML = `
+      <div class="gacha-area">
+        <div style="font-size:48px;margin-bottom:16px;">🥚</div>
+        <p style="color:var(--dim);margin-bottom:20px;font-size:13px;">Enter a userId to deterministically generate a companion.<br>Same ID always produces the same result!</p>
+        <div class="gacha-input-row">
+          <input type="text" id="gachaInput" placeholder="Enter userId or email..." value="">
+          <button class="gacha-btn primary" onclick="doGachaRoll()">Hatch!</button>
+        </div>
+        <button class="gacha-btn secondary" onclick="doRandomRoll()" style="width:100%">🎲 Random Roll</button>
+        <div class="rarity-distribution" style="margin-top:20px;">
+          <div style="width:60%;background:var(--common)" title="Common 60%"></div>
+          <div style="width:25%;background:var(--uncommon)" title="Uncommon 25%"></div>
+          <div style="width:10%;background:var(--rare)" title="Rare 10%"></div>
+          <div style="width:4%;background:var(--epic)" title="Epic 4%"></div>
+          <div style="width:1%;background:var(--legendary)" title="Legendary 1%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--dim);">
+          <span style="color:var(--common)">Common 60%</span>
+          <span style="color:var(--uncommon)">Uncommon 25%</span>
+          <span style="color:var(--rare)">Rare 10%</span>
+          <span style="color:var(--epic)">Epic 4%</span>
+          <span style="color:var(--legendary)">Legendary 1%</span>
+        </div>
+      </div>
+    `;
+    setTimeout(()=>document.getElementById('gachaInput')?.focus(), 100);
+    document.getElementById('gachaInput')?.addEventListener('keydown', (e) => { if(e.key==='Enter') doGachaRoll(); });
+  } else if(state.gachaPhase === 'hatching') {
+    container.innerHTML = `<div class="gacha-area"><div class="hatch-animation">🥚💥</div><p style="color:var(--dim)">Hatching...</p></div>`;
+    setTimeout(()=>{ state.gachaPhase='result'; render(); }, 1200);
+  } else if(state.gachaPhase === 'result' && state.gachaComp) {
+    const c = state.gachaComp;
+    const color = `var(--${c.rarity})`;
+    const face = FACES[c.species](c.eye);
+
+    // Build full DOM only once, then update sprite each tick
+    if(!document.getElementById('gachaSpriteContent')) {
+      container.innerHTML = `
+        <div class="gacha-area">
+          <div class="card ${c.rarity} hatched" style="text-align:left;margin:0 auto;">
+            <div class="card-sprite"><div id="gachaSpriteContent"></div></div>
+            <div class="card-info">
+              <div>
+                <div class="card-name" style="color:${color}">${c.shiny?'<span class="shiny">✨</span>':''}${c.name}</div>
+                <div class="card-species">${c.species} ${escHtml(face)}</div>
+              </div>
+              <div class="card-rarity" style="color:${color}">${RARITY_STARS[c.rarity]}<br>${c.rarity.toUpperCase()}</div>
+            </div>
+            <div class="card-stats">
+              ${STAT_NAMES.map(s=>`
+                <div class="stat-row">
+                  <span class="stat-label">${s}</span>
+                  <div class="stat-bar-bg"><div class="stat-bar" style="width:${c.stats[s]}%;background:${color}"></div></div>
+                  <span class="stat-value">${c.stats[s]}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
+            <button class="gacha-btn secondary" onclick="state.gachaPhase='input';gachaMounted=false;render();">↩ Back</button>
+            <button class="gacha-btn primary" onclick="doRandomRoll()">🎲 Roll Again</button>
+          </div>
+        </div>
+      `;
+    }
+    const gel = document.getElementById('gachaSpriteContent');
+    if(gel) gel.innerHTML = buildSpriteHtml(c.species, c.eye, c.hat, state.tick, c.name, color);
+  }
+}
+
+function doGachaRoll() {
+  const input = document.getElementById('gachaInput')?.value?.trim();
+  if(!input) return;
+  state.gachaComp = rollCompanion(input);
+  state.gachaPhase = 'hatching';
+  render();
+}
+function doRandomRoll() {
+  state.gachaComp = rollCompanion('rng-' + Date.now() + Math.random());
+  state.gachaPhase = 'hatching';
+  // Force re-mount gacha card on next result render
+  const old = document.getElementById('gachaSpriteContent');
+  if(old) old.id = '';
+  render();
+}
+
+// ── Animation Loop ──
+function restartAnimation() {
+  if(state.animTimer) clearInterval(state.animTimer);
+  state.animTimer = setInterval(()=>{
+    state.tick++;
+    const container = document.getElementById('viewContainer');
+    if(state.view === 'card') renderCard(container);
+    else if(state.view === 'gallery') renderGallery(container);
+    else if(state.view === 'gacha' && state.gachaPhase === 'result') renderGacha(container);
+  }, state.speed);
+}
+
+// ── Boot ──
+render();
+restartAnimation();
+</script>
+</body>
+</html>
