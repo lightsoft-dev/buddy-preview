@@ -1,9 +1,8 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { rollCompanion, RARITY_STARS } from './buddy.js';
 
 export async function generateMetadata({ searchParams }) {
-  const user = searchParams?.user;
+  const params = await searchParams;
+  const user = params?.user;
   if (!user) {
     return {
       title: 'Claude Code Buddy Preview',
@@ -29,14 +28,12 @@ export async function generateMetadata({ searchParams }) {
 }
 
 export default function Page() {
-  const html = readFileSync(join(process.cwd(), 'public', 'app.html'), 'utf-8');
-  // Extract just the body content (between <body> and </body>)
-  // Actually, we serve the full HTML as a raw page
+  // Redirect to the static app.html — Next.js serves OG meta, then client loads the app
   return (
-    <iframe
-      srcDoc={html}
-      style={{ width: '100vw', height: '100vh', border: 'none', position: 'fixed', top: 0, left: 0 }}
-      title="Buddy Preview"
-    />
+    <html>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: `window.location.replace('/app.html' + window.location.search)` }} />
+      </body>
+    </html>
   );
 }
