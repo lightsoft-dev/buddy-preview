@@ -97,8 +97,9 @@ export async function GET(req) {
             </div>
 
             {/* Footer */}
-            <div style={{ display: 'flex', color: '#484f58', fontSize: '13px', marginTop: '12px', borderTop: '1px solid #30363d', paddingTop: '12px' }}>
-              Claude Code Buddy Preview
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#484f58', fontSize: '13px', marginTop: '12px', borderTop: '1px solid #30363d', paddingTop: '12px' }}>
+              <div style={{ display: 'flex' }}>Claude Code Buddy Preview</div>
+              <div style={{ display: 'flex' }}>github.com/Zimins/buddy-preview</div>
             </div>
           </div>
         </div>
