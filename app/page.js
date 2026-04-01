@@ -29,7 +29,7 @@ export async function generateMetadata({ searchParams }) {
 }
 
 export default function Page() {
-  const html = readFileSync(join(process.cwd(), 'public', 'index.html'), 'utf-8');
+  const html = readFileSync(join(process.cwd(), 'public', 'app.html'), 'utf-8');
   // Extract just the body content (between <body> and </body>)
   // Actually, we serve the full HTML as a raw page
   return (
